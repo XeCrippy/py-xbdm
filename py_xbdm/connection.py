@@ -11,9 +11,7 @@ class XBDMConnection:
 
     def connect(self):
         try:
-            self.sock = socket.create_connection(
-                (self.host, self.port), self.timeout
-            )
+            self.sock = socket.create_connection((self.host, self.port), self.timeout)
         except OSError as e:
             raise XBDMConnectionError(str(e))
 

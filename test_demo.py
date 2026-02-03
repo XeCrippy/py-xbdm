@@ -1,6 +1,6 @@
 from py_xbdm.client import XBDMClient
 
-XBOX_IP = "ENTER_XBOX_IP_HERE" # Replace with your Xbox IP address
+XBOX_IP = "ENTER_YOUR_XBOX_IP" # Replace with your Xbox IP address
 
 with XBDMClient(XBOX_IP) as xbdm:
     print("Connected to: " + xbdm.console_name())
@@ -25,3 +25,4 @@ with XBDMClient(XBOX_IP) as xbdm:
     xbdm.__exit__(None, None, None)
     print("Disconnected")
     input("press enter to exit....")
+    
