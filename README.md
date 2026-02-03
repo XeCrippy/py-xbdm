@@ -15,3 +15,11 @@
 * In Progress:
   - File Management
   - Miscellaneous missing functions
+
+<details>
+  <summary>Images</summary> 
+    # PC command line
+    <a href="https://gyazo.com/cc4427a1fe3110a284f14a1a1ffe23d9"><img src="https://i.gyazo.com/cc4427a1fe3110a284f14a1a1ffe23d9.png" alt="Image from Gyazo" width="1108"/></a>
+    # PC Gui
+    <a href="https://gyazo.com/3a7687c1ad069f47c3cea9268bc253bb"><img src="https://i.gyazo.com/3a7687c1ad069f47c3cea9268bc253bb.png" alt="Image from Gyazo" width="818"/></a>
+</details>
