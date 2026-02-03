@@ -31,10 +31,13 @@ class XBDMClient:
         self.conn.close()
 
     # Call a function that returns an integer
+    # Usage: result = xbdm.call_int(addr, [0, "string_param", 1.0])
     def call_int(self, address: int, args, system_thread: bool = True) -> int:
         result = self.call_function(address, args, return_type=self.INT, system_thread=system_thread)
         return int(result, 16)
-    
+
+    # Call a function with any return type
+    # usage: u64_value = xbdm.call_function(addr, [0, "str_param", 1.0], xbdm.UINT64)
     def call_function(self, address: int, args, return_type: any = INT, system_thread: bool = True):
         cmd = []
         cmd.append("consolefeatures ver=2")
@@ -172,7 +175,9 @@ class XBDMClient:
                 break
             data.append(byte[0])
         return data.decode('utf-8')
-    
+
+    # Reaolve a function address at a specified ordinal within a specified module
+    # addr = xbdm.resolve_functiom("xam.xex", 0x1FC)
     def resolve_function(self, module_name: str, ordinal: int) -> int:
         hex_module = ''.join(f"{ord(c):02X}" for c in module_name)
 
@@ -203,6 +208,7 @@ class XBDMClient:
         data = data[::-1]
         write_memory(self.conn, address, data)
 
+    # PatchInJump
     def write_hook(self, address: int, destination: int, linked: bool):
         func = [0, 0, 0, 0]
         if (destination & 0x8000) != 0:
