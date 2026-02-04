@@ -1,4 +1,5 @@
 # Py_xbdm
+Py-xbdm is meant to be a replacement for XDevkit/JRPC_Client (PC side libraries for building RTE tools) for python.
 
 - This is currently a work in progress
 - I will provide further instructions and documentation soon
@@ -6,6 +7,10 @@
 - Figuring out the function calls was a pain but once I get the difficult stuff out of the way I will add more features
 - This works from mobile devices using a python emulator
 
+* Requirements:
+  - Python (I'm using 3.9)
+  - xbdm.xex set as a plugin on your console
+  - JRPC2.xex set as a plugin on your console 
 
 * Key features:
   - Basic console related info
@@ -14,12 +19,12 @@
 
 * In Progress:
   - File Management
-  - Miscellaneous missing functions
+  - Miscellaneous missing functions/commands
 
 <details>
   <summary>Images</summary> 
-    # PC command line
+    # command line tool example
     <a href="https://gyazo.com/cc4427a1fe3110a284f14a1a1ffe23d9"><img src="https://i.gyazo.com/cc4427a1fe3110a284f14a1a1ffe23d9.png" alt="Image from Gyazo" width="1108"/></a>  
-    # PC Gui
+    # GUI example
     <a href="https://gyazo.com/3a7687c1ad069f47c3cea9268bc253bb"><img src="https://i.gyazo.com/3a7687c1ad069f47c3cea9268bc253bb.png" alt="Image from Gyazo" width="818"/></a>
 </details>
