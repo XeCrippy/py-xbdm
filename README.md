@@ -16,6 +16,7 @@ Py-xbdm is meant to be a replacement for XDevkit/JRPC_Client (PC side libraries 
   - Basic console related info
   - Read/Write Memory
   - Function Calls (void, int, etc.)
+  - Find available console Ip's (can connect without manually entering ip now)
 
 * In Progress:
   - File Management
