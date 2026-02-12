@@ -21,6 +21,7 @@ Py-xbdm is meant to be a replacement for XDevkit/JRPC_Client (PC side libraries 
 * In Progress:
   - File Management
   - Miscellaneous missing functions/commands
+  - Screenshots (working for Desktops, sorting out packaging issues for pypng on mobile devices)
 
 <details>
   <summary>Images</summary> 
