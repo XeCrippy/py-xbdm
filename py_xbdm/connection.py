@@ -1,9 +1,10 @@
 import socket
 from .exceptions import XBDMConnectionError
+from py_xbdm import discovery
 
 
 class XBDMConnection:
-    def __init__(self, host, port=730, timeout=5.0):
+    def __init__(self, host=discovery.xbox_ip(), port=730, timeout=5.0):
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -24,6 +25,11 @@ class XBDMConnection:
         if not self.sock:
             raise XBDMConnectionError("Not connected")
         self.sock.sendall(data)
+
+    def recv(self, bufsize: int) -> bytes:
+        if not self.sock:
+            raise XBDMConnectionError("Not connected")
+        return self.sock.recv(bufsize)
 
     def recv_exact(self, size: int) -> bytes:
         buf = b""
