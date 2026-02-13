@@ -2,11 +2,6 @@
 
 A Python library for Xbox 360 remote debugging and control via XBDM (Xbox Debug Monitor) protocol.
 
-## Installation
-
-```bash
-pip install numpy pillow flet
-```
 
 ## Core Class: XBDMClient
 
@@ -261,5 +256,6 @@ except RuntimeError as e:
 ---
 
 *This library is provided as-is for educational and development purposes.*
+
 
 
