@@ -2,6 +2,11 @@
 
 A Python library for Xbox 360 remote debugging and control via XBDM (Xbox Debug Monitor) protocol.
 
+## Installation
+`Required for screenshot functions`
+```bash
+pip install numpy pillow
+```
 
 ## Core Class: XBDMClient
 
@@ -233,8 +238,15 @@ except RuntimeError as e:
 
 ---
 
+## Credits & References
 
-### Technical References & Credits
+### Dependencies
+
+- **[NumPy](https://numpy.org/)** — High-performance array computing; used for vectorized Xbox 360 framebuffer untiling (18x speedup)
+- **[Pillow (PIL)](https://python-pillow.org/)** — Python Imaging Library; handles framebuffer image conversion, cropping, and PNG encoding
+- **[Flet](https://flet.dev/)** — Flutter-based GUI framework for cross-platform mobile/desktop UI
+
+### Technical References
 
 - **[Xenia Xbox 360 Emulator](https://github.com/xenia-project/xenia)** — Open-source Xbox 360 emulator; `texture_address::Tiled2D` untiling algorithm adapted from Xenia's GPU texture address calculations
 - **Xbox 360 Xenos GPU** — Framebuffer tiling uses XG (XBox Graphics) 2D tiled addressing with bank/pipe interleaving
@@ -249,7 +261,5 @@ except RuntimeError as e:
 ---
 
 *This library is provided as-is for educational and development purposes.*
-
-
 
 
