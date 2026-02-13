@@ -244,7 +244,6 @@ except RuntimeError as e:
 
 - **[NumPy](https://numpy.org/)** — High-performance array computing; used for vectorized Xbox 360 framebuffer untiling (18x speedup)
 - **[Pillow (PIL)](https://python-pillow.org/)** — Python Imaging Library; handles framebuffer image conversion, cropping, and PNG encoding
-- **[Flet](https://flet.dev/)** — Flutter-based GUI framework for cross-platform mobile/desktop UI
 
 ### Technical References
 
@@ -261,5 +260,6 @@ except RuntimeError as e:
 ---
 
 *This library is provided as-is for educational and development purposes.*
+
 
 
