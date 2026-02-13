@@ -49,6 +49,9 @@ class XBDMClient:
         self.send_command("bye")
         self.conn.close()
 
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
     def reconnect(self, host=discovery.xbox_ip()):
         self.conn.close()
         self.conn = XBDMConnection(host)
@@ -86,23 +89,24 @@ class XBDMClient:
             response = self.send_command(f"consolefeatures buf_addr=0x{buf}")
 
         return response.message.strip()
+    
 
     def call_void(self, address: int, args=[None], system_thread: bool = True):
         self.call_function(address, args, return_type=self.VOID, system_thread=system_thread)
+
 
     def console_name(self) -> str:
         resp = self.send_command("dbgname")
         return resp.message.strip()
 
 
-    def create_directory(self, remotePath: str) -> bool:
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
+    def create_directory(self, remotePath: str) -> int:
         command = "mkdir name=\"" + remotePath + "\""
         response = self.send_command(command)
-        if response.code != 410:
-            return True
-        elif response.code == 200:
-            return False
-        return True
+        return response.code # handle responses in caller to allow for idempotent directory creation
     
     
     def debug_go(self):
@@ -152,13 +156,7 @@ class XBDMClient:
             resp.message = resp.message[len(" consoleid="):]
         return resp.message.strip()
     
-    
-    def get_console_type(self) -> str:
-        cmd = f"consolefeatures ver=2 type=17 params=\"A\\0\\A\\0\\\""; 
-        resp = self.send_command(cmd)
-        return resp.message.strip()
-    
-    
+
     def get_current_title_id(self) -> str:
         cmd = f"consolefeatures ver=2 type=16 params=\"A\\0\\A\\0\\\""
         resp = self.send_command(cmd)
@@ -170,23 +168,22 @@ class XBDMClient:
         resp = self.send_command(cmd)
         return bytes.fromhex(resp.message)
     
-    
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
     def get_directory_contents(self, remote_path: str):
-        cmd = f'dirlist name="{remote_path}"\r\n'
-        resp = self.send_command(cmd)
-        if resp.code != 200:
-            raise RuntimeError(f"Failed to list directory: {remote_path}")
-
-        lines = resp.message.strip().splitlines()
-        entries = []
+        cmd = f'dirlist name="{remote_path}"'
+        lines = self.send_multiline_command(cmd)
+        contents = []
         for line in lines:
             parts = line.split()
             if len(parts) < 3:
                 continue
-            is_directory = parts[0] == "dir"
-            name = " ".join(parts[2:])
-            entries.append({"name": name, "is_directory": is_directory})
-        return entries
+            name = " ".join(parts[:-2])
+            is_directory = parts[-2] == "<DIR>"
+            size = int(parts[-1]) if not is_directory else 0
+            contents.append({"name": name, "is_directory": is_directory, "size": size})
+        return contents
     
     
     def get_kernel_version(self) -> str:
@@ -200,6 +197,30 @@ class XBDMClient:
         lines = self.send_multiline_command(cmd)
         return lines
     
+
+    def get_module_handle(self, module_name: str) -> int:
+        try:
+            address = self.resolve_function("xam.xex", 1102)
+            handle = self.call_int(address, [module_name])
+            if handle == 0:
+                raise RuntimeError(f"Couldn't get the module handle for {module_name}")
+            return handle
+        except Exception as e:
+            raise RuntimeError(f"Error getting module handle for {module_name}: {e}")
+        
+        
+    def get_motherboard_type(self) -> str:
+        cmd = f"consolefeatures ver=2 type=17 params=\"A\\0\\A\\0\\\""; 
+        resp = self.send_command(cmd)
+        return resp.message.strip()
+    
+    def get_process_id(self) -> int:
+        cmd = f"getpid"
+        resp = self.send_command(cmd)
+        if resp.code != 200:
+            raise RuntimeError(f"Failed to get process ID: {resp.code} {resp.message}")
+        return int(resp.message.strip(), 16)
+    
     
     def is_directory(self, path: str) -> bool:
         command = "dirlist name=\"" + path + "\""
@@ -211,7 +232,15 @@ class XBDMClient:
         else:
             raise RuntimeError(f"Unexpected response code: {response.code}")
         
-    
+        
+
+    def launch_xex(self, xex_name: str, directory_name: str):
+        cmd = f'magicboot title="{xex_name}" directory="{directory_name}"'
+        resp = self.send_command(cmd)
+        if resp.code != 200:
+            raise RuntimeError(f"Failed to launch XEX: {resp.code} {resp.message}")
+        
+
     def load_module(self, module_path: str) -> int:
         addr = self.resolve_function("xboxkrnl.exe", 409)
         result = self.call_int(addr, [module_path, 8, 0, 0])
@@ -271,27 +300,32 @@ class XBDMClient:
         raw = read_memory_text(self.conn, address, 8)
         return int.from_bytes(raw, "big")
     
-
+    
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
     def read_cstring(self, address: int, max_length: int = 256) -> str:
-        data = bytearray()
-        for i in range(max_length):
-            byte = self.read_memory(address + i, 1)
-            if byte[0] == 0:
-                break
-            data.append(byte[0])
-        return data.decode('utf-8')
+        raw = self.read_memory(address, max_length)
+        string = raw.split(b'\x00', 1)[0]
+        return string.decode('utf-8')
     
-    
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
     def read_wstring(self, address: int, max_length: int = 256) -> str:
-        data = bytearray()
-        for i in range(max_length):
-            bytes_ = self.read_memory(address + i*2, 2)
-            if bytes_ == b'\x00\x00':
-                break
-            data.extend(bytes_)
-        return data.decode('utf-16le')
+        raw = self.read_memory(address, max_length * 2)
+        string = raw.split(b'\x00\x00', 1)[0]
+        return string.decode('utf-16le')
     
     
+    def reboot_console(self):
+        command = "magicboot cold"
+        self.send_command(command)
+
+    
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
     def receive_directory(self, remote_path: str, local_path: str):
         import os
         files = self.get_directory_contents(remote_path)
@@ -306,6 +340,7 @@ class XBDMClient:
                 self.receive_directory(f"{remote_path}\\{file['name']}", next_directory)
             else:
                 self.receive_file(f"{remote_path}\\{file['name']}", next_directory)
+
 
     def receive_file(self, remote_path: str, local_path: str):
         with open(local_path, 'wb') as file:
@@ -334,6 +369,15 @@ class XBDMClient:
         cmd = f'consolefeatures ver=2 type=9 params="A\\0\\A\\2\\{self.BYTE_ARRAY}/{len(hex_module)//2}\\{hex_module}\\{self.INT}\\{ordinal}\\"'
         resp = self.send_command(cmd)
         return int(resp.message.strip(), 16)
+    
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """
+    def rename_file(self, old_remote_path: str, new_remote_path: str):
+        cmd = f'rename name="{old_remote_path}" newname="{new_remote_path}"'
+        resp = self.send_command(cmd)
+        if resp.code != 200:
+            raise RuntimeError(f"Couldn't rename {old_remote_path} to {new_remote_path}")
     
 
     def parse_hex_field(self, text: str, key: str) -> int:
@@ -641,7 +685,10 @@ class XBDMClient:
         response = self.send_command(command)
         if response.code != 200:
             raise Exception(f"Failed to set system time with error code {response.code}\nMessage: {response.message}")
-        
+
+    """
+    UNTESTED/EXPERIMENTAL BELOW
+    """    
     def send_directory(self, local_path: str, remote_path: str):
         for entry in os.listdir(local_path):
             local_entry_path = os.path.join(local_path, entry)
@@ -695,6 +742,10 @@ class XBDMClient:
             self.write_u16(handle + 0x40, 1)
             addr_unload = self.resolve_function("xboxkrnl.exe", 417)
             self.call_int(addr_unload, [handle])
+
+    def write_boolean(self, address: int, value: bool):
+        byte_value = 1 if value else 0
+        write_memory(self.conn, address, byte_value.to_bytes(1, 'big'))
     
     def write_double(self, address: int, value: float):
         data = struct.pack('<d', value)

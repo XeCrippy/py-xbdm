@@ -40,11 +40,18 @@ class XBDMConnection:
             buf += chunk
         return buf
 
+    """
+    Reading one byte at a time may be inefficient, but XBDM protocol lines are typically short,
+    so the performance impact should be minimal for most use cases. I have made the same library in C# and C++ 
+    you will end up with junk characters at some point or broken reads eventually. At least from my experience.
+    """
     def recv_line(self) -> bytes:
         buf = b""
-        while not buf.endswith(b"\r\n"):
-            chunk = self.sock.recv(1)
-            if not chunk:
+        while True:
+            char = self.sock.recv(1) 
+            if not char:
                 raise XBDMConnectionError("Connection closed")
-            buf += chunk
+            buf += char
+            if char == b"\n":
+                break
         return buf
