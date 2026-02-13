@@ -9,7 +9,7 @@ pip install numpy pillow
 ```
 ## Console Prerequisites 
 `- xbdm.xex and JRPC2.xex set as plugins`
-`- functions that send a command that start with `consolefeatures ver=2....` are JRPC specific. XDRPC uses a similar command for RPC`
+`- functions that send a command that start with consolefeatures ver=2.... are JRPC specific. XDRPC uses a similar command for RPC`
 
 ## Core Class: XBDMClient
 
@@ -263,6 +263,7 @@ except RuntimeError as e:
 ---
 
 *This library is provided as-is for educational and development purposes.*
+
 
 
 
