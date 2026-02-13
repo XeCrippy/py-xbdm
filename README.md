@@ -3,10 +3,13 @@
 A Python library for Xbox 360 remote debugging and control via XBDM (Xbox Debug Monitor) protocol.
 
 ## Installation
-
+`Required for screenshot functions`
 ```bash
-pip install numpy pillow flet
+pip install numpy pillow
 ```
+## Console Prerequisites 
+- xbdm.xex and JRPC2.xex set as plugins
+* functions that send a command that starts with `consolefeatures ver=2....` are JRPC specific. XDRPC uses a similar command for RPC
 
 ## Core Class: XBDMClient
 
@@ -244,7 +247,6 @@ except RuntimeError as e:
 
 - **[NumPy](https://numpy.org/)** — High-performance array computing; used for vectorized Xbox 360 framebuffer untiling (18x speedup)
 - **[Pillow (PIL)](https://python-pillow.org/)** — Python Imaging Library; handles framebuffer image conversion, cropping, and PNG encoding
-- **[Flet](https://flet.dev/)** — Flutter-based GUI framework for cross-platform mobile/desktop UI
 
 ### Technical References
 
@@ -261,5 +263,7 @@ except RuntimeError as e:
 ---
 
 *This library is provided as-is for educational and development purposes.*
+
+
 
 
