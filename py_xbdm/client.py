@@ -11,8 +11,8 @@ import numpy as np
 from PIL import Image
 
 # Local imports
-from py_xbdm import discovery
 from py_xbdm.connection import XBDMConnection
+from py_xbdm.exceptions import XBDMFileAlreadyExistsError
 from py_xbdm.protocol import parse_response_line
 from py_xbdm.memory import read_memory_text, write_memory
 
@@ -31,8 +31,10 @@ class XBDMClient:
     BYTE_ARRAY  = 7
     UINT64_ARRAY= 9
 
-    def __init__(self, host=discovery.xbox_ip()):
-        self.conn = XBDMConnection(host)
+    def __init__(self):
+        self.conn = XBDMConnection()
+        self._flush_stub_addr = 0
+        self._flush_stub_size = 0
 
     def __enter__(self):
         self.conn.connect()
@@ -48,11 +50,12 @@ class XBDMClient:
     def close(self):
         self.send_command("bye")
         self.conn.close()
+        self = None
 
     """
     UNTESTED/EXPERIMENTAL BELOW
     """
-    def reconnect(self, host=discovery.xbox_ip()):
+    def reconnect(self, host):
         self.conn.close()
         self.conn = XBDMConnection(host)
         self.conn.connect()
@@ -61,10 +64,21 @@ class XBDMClient:
 
         return self
 
-    # Call a function that returns an integer
-    def call_int(self, address: int, args, system_thread: bool = True) -> int:
-        result = self.call_function(address, args, return_type=self.INT, system_thread=system_thread)
-        return int(result, 16)
+    def call_float(self, address: int, args, system_thread: bool = True) -> float:
+        '''
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :param address: Function address to call on the Xbox 360
+        :type address: int
+        :param args: Arguments to pass to the function
+        :param system_thread: Whether to call the function on the system thread (default: True)
+        :type system_thread: bool
+        :return: The return value of the function call, interpreted as a float
+        :rtype: float
+        '''
+        result = self.call_function(address, args, return_type=self.FLOAT, system_thread=system_thread)
+        return float(result)
     
     def call_function(self, address: int, args, return_type: any = INT, system_thread: bool = True):
         cmd = []
@@ -89,20 +103,72 @@ class XBDMClient:
             response = self.send_command(f"consolefeatures buf_addr=0x{buf}")
 
         return response.message.strip()
+
+    def call_int32(self, address: int, args, system_thread: bool = True) -> int:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :param address: Function address to call on the Xbox 360
+        :type address: int
+        :param args: Arguments to pass to the function
+        :param system_thread: Whether to call the function on the system thread (default: True)
+        :type system_thread: bool
+        :return: The return value of the function call, interpreted as an integer
+        :rtype: int
+        """
+        result = self.call_function(address, args, return_type=self.INT, system_thread=system_thread)
+        return int(result, 16)
     
-
+    def call_int64(self, address: int, args, system_thread: bool = True) -> int:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :param address: Function address to call on the Xbox 360
+        :type address: int
+        :param args: Arguments to pass to the function
+        :param system_thread: Whether to call the function on the system thread (default: True)
+        :type system_thread: bool
+        :return: The return value of the function call, interpreted as a 64-bit integer
+        :rtype: int
+        """
+        result = self.call_function(address, args, return_type=self.UINT64, system_thread=system_thread)  
+        return int(result, 16)
+    
+    def call_string(self, address: int, args, system_thread: bool = True) -> str:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :param address: Function address to call on the Xbox 360
+        :type address: int
+        :param args: Arguments to pass to the function
+        :param system_thread: Whether to call the function on the system thread (default: True)
+        :type system_thread: bool
+        :return: The return value of the function call, interpreted as a string
+        :rtype: str
+        """
+        result = self.call_function(address, args, return_type=self.STRING, system_thread=system_thread)
+        return result
+    
     def call_void(self, address: int, args=[None], system_thread: bool = True):
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :param address: Function address to call on the Xbox 360
+        :type address: int
+        :param args: Arguments to pass to the function
+        :param system_thread: Whether to call the function on the system thread (default: True)
+        :type system_thread: bool
+        """
         self.call_function(address, args, return_type=self.VOID, system_thread=system_thread)
-
 
     def console_name(self) -> str:
         resp = self.send_command("dbgname")
         return resp.message.strip()
 
-
-    """
-    UNTESTED/EXPERIMENTAL BELOW
-    """
     def create_directory(self, remotePath: str) -> int:
         command = "mkdir name=\"" + remotePath + "\""
         response = self.send_command(command)
@@ -125,6 +191,12 @@ class XBDMClient:
         
     
     def encode_argument(self, arg):
+        """
+        * This function encodes a Python argument into the format expected by the custom command protocol used by JRPC2.xex.
+        
+        :param self: XBDMClient instance
+        :param arg: The argument to encode
+        """
         if isinstance(arg, int):
             return f"{self.INT}\\{arg}\\"
 
@@ -144,61 +216,131 @@ class XBDMClient:
     
     
     def timet_to_filetime(self, unix_time: int) -> int:
-        # Convert Unix time (seconds since 1970-01-01)
-        # to Windows FILETIME (100-ns intervals since 1601-01-01)
+        """
+        Convert Unix time (seconds since 1970-01-01) to Windows FILETIME (100-ns intervals since 1601-01-01)
+        
+        :param self: XBDMClient instance
+        :param unix_time: Unix time in seconds
+        :type unix_time: int
+        :return: Windows FILETIME
+        :rtype: int
+        """
         return (unix_time + 11644473600) * 10_000_000
     
-
-    def get_console_id(self) -> str:
+    
+    def get_console_id(self) -> int:
+        """
+        Docstring for get_console_id
+        
+        :param self: XBDMClient instance
+        :return: The console ID as an integer
+        :rtype: int
+        """
         cmd = f"getconsoleid"
         resp = self.send_command(cmd)
         if resp.message.startswith(" consoleid="):
             resp.message = resp.message[len(" consoleid="):]
-        return resp.message.strip()
+        return int(resp.message.strip(), 16)
     
 
-    def get_current_title_id(self) -> str:
+    def get_current_title_id(self) -> int:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :return: The currently running title ID as an integer
+        :rtype: int
+        """
         cmd = f"consolefeatures ver=2 type=16 params=\"A\\0\\A\\0\\\""
         resp = self.send_command(cmd)
-        return resp.message.strip()
+        return int(resp.message.strip(), 16)
     
     
     def get_cpukey(self) -> bytes:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+
+        :param self: XBDMClient instance
+        :return: The CPU key as a bytes object
+        :rtype: bytes
+        """
         cmd = f"consolefeatures ver=2 type=10 params=\"A\\0\\A\\0\\\""; 
         resp = self.send_command(cmd)
         return bytes.fromhex(resp.message)
     
     """
-    UNTESTED/EXPERIMENTAL BELOW
+    Example directory listing line:
+    'name="kv.bin" sizehi=0x0 sizelo=0x4000 createhi=0x01db9696 createlo=0xf9eed000 changehi=0x01db9696 changelo=0xf9eed000',
+    'name="Cache" sizehi=0x0 sizelo=0x0 createhi=0x01c5ef5c createlo=0x70e4ce00 changehi=0x01c5ef5c changelo=0x70e4ce00 directory',
     """
     def get_directory_contents(self, remote_path: str):
         cmd = f'dirlist name="{remote_path}"'
         lines = self.send_multiline_command(cmd)
         contents = []
         for line in lines:
-            parts = line.split()
-            if len(parts) < 3:
-                continue
-            name = " ".join(parts[:-2])
-            is_directory = parts[-2] == "<DIR>"
-            size = int(parts[-1]) if not is_directory else 0
-            contents.append({"name": name, "is_directory": is_directory, "size": size})
+            entry = {}
+            m_name = re.search(r'name="([^"]+)"', line)
+            if m_name:
+                entry['name'] = m_name.group(1)
+
+            m_sizehi = re.search(r'sizehi=0x([0-9a-fA-F]+)', line)
+            m_sizelo = re.search(r'sizelo=0x([0-9a-fA-F]+)', line)
+            if m_sizehi and m_sizelo:
+                entry['size'] = (int(m_sizehi.group(1), 16) << 32) | int(m_sizelo.group(1), 16)
+
+            m_createhi = re.search(r'createhi=0x([0-9a-fA-F]+)', line)
+            m_createlo = re.search(r'createlo=0x([0-9a-fA-F]+)', line)
+            if m_createhi and m_createlo:
+                entry['created'] = (int(m_createhi.group(1), 16) << 32) | int(m_createlo.group(1), 16)
+
+            m_changehi = re.search(r'changehi=0x([0-9a-fA-F]+)', line)
+            m_changelo = re.search(r'changelo=0x([0-9a-fA-F]+)', line)
+            if m_changehi and m_changelo:
+                entry['changed'] = (int(m_changehi.group(1), 16) << 32) | int(m_changelo.group(1), 16)
+
+            entry['is_directory'] = 'directory' in line
+
+            contents.append(entry)
         return contents
     
-    
+
+    def get_drive_list(self) -> list:
+        cmd = "drivelist"
+        lines = self.send_multiline_command(cmd)
+        drives = []
+        for line in lines:
+            m = re.search(r'drivename="([^"]+)"', line)
+            if m:
+                drives.append(m.group(1))
+        return drives
+      
     def get_kernel_version(self) -> str:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :return: The kernel version as a string
+        :rtype: str
+        """
         cmd = f"consolefeatures ver=2 type=13 params=\"A\\0\\A\\0\\\""
         resp = self.send_command(cmd)
         return resp.message.strip()
-
 
     def get_modules(self) -> list:
         cmd = f"modules"
         lines = self.send_multiline_command(cmd)
         return lines
     
-
     def get_module_handle(self, module_name: str) -> int:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :param module_name: The name of the module to get the handle for
+        :type module_name: str
+        :return: The handle of the module as an integer
+        :rtype: int
+        """
         try:
             address = self.resolve_function("xam.xex", 1102)
             handle = self.call_int(address, [module_name])
@@ -210,6 +352,13 @@ class XBDMClient:
         
         
     def get_motherboard_type(self) -> str:
+        """
+        * This function requires JRPC2.xex to be loaded on the console, as it relies on a custom command protocal
+        
+        :param self: XBDMClient instance
+        :return: The motherboard type as a string
+        :rtype: str
+        """
         cmd = f"consolefeatures ver=2 type=17 params=\"A\\0\\A\\0\\\""; 
         resp = self.send_command(cmd)
         return resp.message.strip()
@@ -221,7 +370,6 @@ class XBDMClient:
             raise RuntimeError(f"Failed to get process ID: {resp.code} {resp.message}")
         return int(resp.message.strip(), 16)
     
-    
     def is_directory(self, path: str) -> bool:
         command = "dirlist name=\"" + path + "\""
         response = self.send_command(command)
@@ -231,22 +379,18 @@ class XBDMClient:
             return False
         else:
             raise RuntimeError(f"Unexpected response code: {response.code}")
-        
-        
 
-    def launch_xex(self, xex_name: str, directory_name: str):
-        cmd = f'magicboot title="{xex_name}" directory="{directory_name}"'
+    def launch_xex(self, name: str, path: str):
+        cmd = "magicboot title=\"" + path + "\" directory=\"" + name + "\""
         resp = self.send_command(cmd)
         if resp.code != 200:
             raise RuntimeError(f"Failed to launch XEX: {resp.code} {resp.message}")
-        
-
+  
     def load_module(self, module_path: str) -> int:
         addr = self.resolve_function("xboxkrnl.exe", 409)
-        result = self.call_int(addr, [module_path, 8, 0, 0])
+        result = self.call_int32(addr, [module_path, 8, 0, 0])
         return result
     
- 
     def parse_return(response, return_type):
         try:
             _, value = response.split(" ", 1)
@@ -301,17 +445,11 @@ class XBDMClient:
         return int.from_bytes(raw, "big")
     
     
-    """
-    UNTESTED/EXPERIMENTAL BELOW
-    """
     def read_cstring(self, address: int, max_length: int = 256) -> str:
         raw = self.read_memory(address, max_length)
         string = raw.split(b'\x00', 1)[0]
         return string.decode('utf-8')
     
-    """
-    UNTESTED/EXPERIMENTAL BELOW
-    """
     def read_wstring(self, address: int, max_length: int = 256) -> str:
         raw = self.read_memory(address, max_length * 2)
         string = raw.split(b'\x00\x00', 1)[0]
@@ -323,9 +461,6 @@ class XBDMClient:
         self.send_command(command)
 
     
-    """
-    UNTESTED/EXPERIMENTAL BELOW
-    """
     def receive_directory(self, remote_path: str, local_path: str):
         import os
         files = self.get_directory_contents(remote_path)
@@ -369,10 +504,8 @@ class XBDMClient:
         cmd = f'consolefeatures ver=2 type=9 params="A\\0\\A\\2\\{self.BYTE_ARRAY}/{len(hex_module)//2}\\{hex_module}\\{self.INT}\\{ordinal}\\"'
         resp = self.send_command(cmd)
         return int(resp.message.strip(), 16)
-    
-    """
-    UNTESTED/EXPERIMENTAL BELOW
-    """
+
+
     def rename_file(self, old_remote_path: str, new_remote_path: str):
         cmd = f'rename name="{old_remote_path}" newname="{new_remote_path}"'
         resp = self.send_command(cmd)
@@ -686,22 +819,23 @@ class XBDMClient:
         if response.code != 200:
             raise Exception(f"Failed to set system time with error code {response.code}\nMessage: {response.message}")
 
-    """
-    UNTESTED/EXPERIMENTAL BELOW
-    """    
-    def send_directory(self, local_path: str, remote_path: str):
+
+    def send_directory(self, local_path: str, remote_path: str, overwrite: bool = False):
         for entry in os.listdir(local_path):
             local_entry_path = os.path.join(local_path, entry)
             remote_entry_path = f"{remote_path}\\{entry}"
 
             if os.path.isdir(local_entry_path):
-                self.create_directory(remote_entry_path)
-                self.send_directory(local_entry_path, remote_entry_path)
+                try:
+                    self.create_directory(remote_entry_path)
+                except Exception:
+                    pass  # directory may already exist
+                self.send_directory(local_entry_path, remote_entry_path, overwrite=overwrite)
             else:
-                self.send_file(local_entry_path, remote_entry_path)
+                self.send_file(local_entry_path, remote_entry_path, overwrite=overwrite)
         
 
-    def send_file(self, local_path: str, remote_path: str):
+    def send_file(self, local_path: str, remote_path: str, overwrite: bool = False):
         with open(local_path, 'rb') as file:
             file.seek(0, 2)
             file_size = file.tell()
@@ -712,7 +846,19 @@ class XBDMClient:
 
             header = self.conn.recv_line()
             if not header.startswith(b'204- send binary data'):
-                raise RuntimeError("Couldn't send the file")
+                if header.startswith(b'410-'):
+                    if overwrite:
+                        self.delete_file(remote_path)
+                        file.seek(0, 0)
+                        cmd = f'sendfile name="{remote_path}" length=0x{file_size:X}\r\n'
+                        self.conn.send(cmd.encode())
+                        header = self.conn.recv_line()
+                        if not header.startswith(b'204- send binary data'):
+                            raise RuntimeError("Couldn't send the file after overwrite")
+                    else:
+                        raise XBDMFileAlreadyExistsError(remote_path)
+                else:
+                    raise RuntimeError("Couldn't send the file")
 
             while True:
                 chunk = file.read(4096)
@@ -737,11 +883,11 @@ class XBDMClient:
             
     def unload_module(self, module: str):
         address = self.resolve_function("xam.xex", 1102)
-        handle = self.call_int(address, [module])
+        handle = self.call_int32(address, [module])
         if handle != 0:
             self.write_u16(handle + 0x40, 1)
             addr_unload = self.resolve_function("xboxkrnl.exe", 417)
-            self.call_int(addr_unload, [handle])
+            self.call_int32(addr_unload, [handle])
 
     def write_boolean(self, address: int, value: bool):
         byte_value = 1 if value else 0
@@ -767,17 +913,65 @@ class XBDMClient:
         data = data[::-1]
         write_memory(self.conn, address, data)
 
-    def write_hook(self, address: int, destination: int, linked: bool):
+    def write_branch(self, address: int, destination: int, linked: bool = False) -> int:
+        """
+        Write a 4-byte relative branch (b or bl) at address.\n
+        The destination must be within ±32MB of the address due to the 26-bit signed offset.
+        
+        Args:
+            address: Where to write the branch instruction.
+            destination: Target address to branch to.
+            linked: If True, use 'bl' (branch with link) instead of 'b' (branch). This will save the return address in the link register (LR).
+
+        Returns:
+            4 (number of bytes overwritten).
+        """
+        offset = destination - address
+        if offset < -0x2000000 or offset > 0x1FFFFFC:
+            raise ValueError(
+                f"Target 0x{destination:08X} is out of range for relative branch "
+                f"from 0x{address:08X} (offset 0x{offset:08X}, max ±32MB)"
+            )
+        opcode = 18
+        lk = 1 if linked else 0
+        instr = (opcode << 26) | (offset & 0x03FFFFFC) | lk
+        self.write_memory(address, instr.to_bytes(4, 'big'))
+        return 4
+
+    def patch_in_jump(self, address: int, destination: int, linked: bool = False, scratch_reg: int = 11) -> int:
+        """Write a 16-byte far branch trampoline (lis+ori+mtctr+bctr) at address.
+
+        Works for any distance. Overwrites 4 instructions (16 bytes).
+
+        Args:
+            address: Where to place the trampoline.
+            destination: Target address to branch to.
+            linked: If True, use 'bctrl' instead of 'bctr'.
+            scratch_reg: GPR to use as scratch (default r11). Use any volatile
+                         register (r0, r3-r12) that isn't live at the hook site.
+
+        Returns:
+            16 (number of bytes overwritten).
+        """
+        r = scratch_reg & 0x1F
+        # lis rN, hi  (addis rN, 0, hi)
+        lis_base  = (15 << 26) | (r << 21)
+        # addi rN, rN, lo
+        addi_base = (14 << 26) | (r << 21) | (r << 16)
+        # mtctr rN
+        mtctr     = (31 << 26) | (r << 21) | (9 << 16) | (467 << 1)
+
         func = [0, 0, 0, 0]
-        if (destination & 0x8000) != 0:
-            func[0] = 0x3D600000 + (((destination >> 16) & 0xFFFF) + 1)
-        else:
-            func[0] = 0x3D600000 + ((destination >> 16) & 0xFFFF)
-            func[1] = 0x396B0000 + (destination & 0xFFFF)
-            func[2] = 0x7D6903A6
-            func[3] = 0x4E800420
+        hi = (destination >> 16) & 0xFFFF
+        lo = destination & 0xFFFF
+        if lo & 0x8000:
+            hi = (hi + 1) & 0xFFFF  # compensate for sign extension in addi
+        func[0] = lis_base + hi
+        func[1] = addi_base + lo
+        func[2] = mtctr
+        func[3] = 0x4E800420  # bctr
         if linked:
-            func[3] += 1
+            func[3] += 1       # bctrl
 
         buffer = bytearray(16)
         for i in range(4):
@@ -785,6 +979,7 @@ class XBDMClient:
             buffer[i*4:(i+1)*4] = part
 
         self.write_memory(address, buffer)
+        return 16
 
     def write_memory(self, address: int, data: bytes):
         write_memory(self.conn, address, data)

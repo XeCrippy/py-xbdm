@@ -19,6 +19,6 @@ def parse_response_line(line: bytes, overide: bool = False) -> XBDMResponse:
     message = text[4:]
 
     if code >= 400 and not overide:
-        raise XBDMCommandError(code, message)
+        raise XBDMCommandError.from_code(code, message)
 
     return XBDMResponse(code, message)

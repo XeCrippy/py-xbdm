@@ -15,24 +15,27 @@ pip install numpy pillow
 
 ### Initialization & Connection
 
-- **`__init__(host=discovery.xbox_ip())`** — Initialize client with console IP
+- **`__init__()`** — Initialize client
 - **`__enter__()`** — Context manager entry; connects and reads banner
 - **`__exit__(exc_type, exc, tb)`** — Context manager exit; closes connection
 - **`close()`** — Manually close the connection
-- **`reconnect(host=discovery.xbox_ip())`** — Reconnect to a console
+- **`reconnect(host)`** — Reconnect to a different console
 
 ### Console Information
 
 - **`console_name() -> str`** — Get console debug name
-- **`get_console_id() -> str`** — Get console hardware ID
-- **`get_console_type() -> str`** — Get console type/version
-- **`get_kernel_version() -> str`** — Get kernel version
-- **`get_current_title_id() -> str`** — Get currently running title ID
-- **`get_cpukey() -> bytes`** — Get console CPU key (16 bytes)
+- **`get_console_id() -> int`** — Get console hardware ID
+- **`get_kernel_version() -> str`** — Get kernel version (requires JRPC2.xex)
+- **`get_current_title_id() -> int`** — Get currently running title ID (requires JRPC2.xex)
+- **`get_cpukey() -> bytes`** — Get console CPU key (16 bytes, requires JRPC2.xex)
+- **`get_motherboard_type() -> str`** — Get motherboard type (requires JRPC2.xex)
+- **`get_process_id() -> int`** — Get current process ID
+- **`get_drive_list() -> list`** — List all available drives on console
 
 ### Module Management
 
 - **`get_modules() -> list`** — List all loaded modules with base, size, etc.
+- **`get_module_handle(module_name: str) -> int`** — Get handle for a loaded module (requires JRPC2.xex)
 - **`load_module(module_path: str) -> int`** — Load a module from filesystem
 - **`unload_module(module: str)`** — Unload a loaded module
 
@@ -52,6 +55,7 @@ pip install numpy pillow
 #### Writing
 
 - **`write_memory(address: int, data: bytes)`** — Write raw bytes
+- **`write_boolean(address: int, value: bool)`** — Write boolean as single byte
 - **`write_string(address: int, string: str)`** — Write UTF-8 string
 - **`write_wstring(address: int, string: str)`** — Write UTF-16LE string
 - **`write_u16(address: int, value: int)`** — Write 16-bit unsigned integer
@@ -66,25 +70,31 @@ pip install numpy pillow
 - **`write_u64_array(address: int, values: list)`** — Write array of 64-bit integers
 - **`zero_memory(address: int, size: int)`** — Zero-fill memory region
 
-### Function Calling
+### Function Calling (Requires JRPC2.xex)
 
 - **`resolve_function(module_name: str, ordinal: int) -> int`** — Get function address by module name and ordinal
-- **`call_function(address: int, args, return_type=INT, system_thread=True)`** — Call function at address with args, return hex string
-- **`call_int(address: int, args, system_thread=True) -> int`** — Call function and return as integer
-- **`call_void(address: int, args=[], system_thread=True)`** — Call function with no return value
+- **`call_function(address: int, args, return_type=INT, system_thread=True)`** — Call function at address with args
+- **`call_void(address: int, args=[None], system_thread=True)`** — Call function with no return value
+- **`call_int32(address: int, args, system_thread=True) -> int`** — Call function and return as 32-bit integer
+- **`call_int64(address: int, args, system_thread=True) -> int`** — Call function and return as 64-bit integer
+- **`call_float(address: int, args, system_thread=True) -> float`** — Call function and return as float
+- **`call_string(address: int, args, system_thread=True) -> str`** — Call function and return as string
 
 ### Code Injection
 
-- **`write_hook(address: int, destination: int, linked: bool)`** — Write PowerPC function hook
+- **`write_branch(address: int, destination: int, linked: bool = False) -> int`** — Write PowerPC relative branch (b/bl) instruction. Works within ±32MB range. Returns 4 bytes overwritten.
+- **`patch_in_jump(address: int, destination: int, linked: bool = False, scratch_reg: int = 11) -> int`** — Write 16-byte far branch trampoline (lis+ori+mtctr+bctr). Works for any distance. Returns 16 bytes overwritten.
 
 ### File System Operations
 
-- **`get_directory_contents(remote_path: str) -> list`** — List directory entries with metadata
+- **`get_directory_contents(remote_path: str) -> list`** — List directory entries with metadata (name, size, created, changed, is_directory)
+- **`get_drive_list() -> list`** — List all available drives on the console
 - **`is_directory(path: str) -> bool`** — Check if path is a directory
-- **`create_directory(remotePath: str) -> bool`** — Create a directory
+- **`create_directory(remotePath: str) -> int`** — Create a directory; returns response code
 - **`delete_file(remote_path: str, is_directory: bool = False)`** — Delete file or directory
-- **`send_file(local_path: str, remote_path: str)`** — Upload file to console
-- **`send_directory(local_path: str, remote_path: str)`** — Recursively upload directory
+- **`rename_file(old_remote_path: str, new_remote_path: str)`** — Rename/move file or directory
+- **`send_file(local_path: str, remote_path: str, overwrite: bool = False)`** — Upload file to console
+- **`send_directory(local_path: str, remote_path: str, overwrite: bool = False)`** — Recursively upload directory
 - **`receive_file(remote_path: str, local_path: str)`** — Download file from console
 - **`receive_directory(remote_path: str, local_path: str)`** — Recursively download directory
 
@@ -111,10 +121,12 @@ pip install numpy pillow
 
 ### System Control
 
-- **`shutdown_console()`** — Shut down the console
+- **`launch_xex(name: str, path: str)`** — Launch an XEX executable on the console
+- **`reboot_console()`** — Perform a cold reboot of the console
+- **`shutdown_console()`** — Shut down the console (requires JRPC2.xex)
 - **`set_system_time(unix_time: int)`** — Set console system time (Unix epoch)
 - **`synchronize_time()`** — Sync console time to PC clock
-- **`xnotify(text: str, type: int = 34)`** — Show notification on console
+- **`xnotify(text: str, type: int = 34)`** — Show notification on console (requires JRPC2.xex)
 
 ### Protocol & Utilities
 
@@ -155,9 +167,11 @@ XBDMClient.UINT64_ARRAY= 9
 ```python
 from py_xbdm.client import XBDMClient
 
-with XBDMClient(discovery.xbox_ip()) as xbdm:
+# Using context manager (recommended)
+with XBDMClient() as xbdm:
     print(xbdm.console_name())
-    print(xbdm.get_console_id())
+    print(hex(xbdm.get_console_id()))
+    print(xbdm.get_kernel_version())
 ```
 
 ### Reading Memory
@@ -174,8 +188,13 @@ string = xbdm.read_cstring(0x80000000, max_length=256)
 # Resolve function address
 addr = xbdm.resolve_function("xboxkrnl.exe", 409)
 
-# Call with arguments
-result = xbdm.call_int(addr, [arg1, arg2, arg3])
+# Call with different return types
+result_int = xbdm.call_int32(addr, [arg1, arg2, arg3])
+result_float = xbdm.call_float(addr, [arg1, arg2])
+result_string = xbdm.call_string(addr, [arg1])
+
+# Call void function
+xbdm.call_void(addr, [arg1, arg2])
 ```
 
 ### Taking Screenshots
@@ -194,23 +213,41 @@ path = xbdm.screenshot(rawmode="RGBA")
 ### File Operations
 
 ```python
-# Upload
-xbdm.send_file("local_file.bin", "hdd:\\local.bin")
+# Upload file with overwrite option
+xbdm.send_file("local_file.bin", "hdd:\\local.bin", overwrite=True)
 
-# Download
+# Download file
 xbdm.receive_file("hdd:\\console_file.bin", "local_copy.bin")
+
+# Rename/move file
+xbdm.rename_file("hdd:\\old_name.bin", "hdd:\\new_name.bin")
 
 # List directory
 files = xbdm.get_directory_contents("hdd:\\")
 for f in files:
-    print(f"{f['name']} - {'dir' if f['is_directory'] else 'file'}")
+    print(f"{f['name']} - {'dir' if f['is_directory'] else 'file'} - {f['size']} bytes")
+
+# List all drives
+drives = xbdm.get_drive_list()
+print(drives)  # ['hdd:', 'dvd:', 'usb0:', ...]
+```
+
+### Code Patching
+
+```python
+# Short-range branch (±32MB, 4 bytes)
+xbdm.write_branch(0x82000000, 0x82000100, linked=False)  # b instruction
+xbdm.write_branch(0x82000000, 0x82000100, linked=True)   # bl instruction
+
+# Long-range jump (any distance, 16 bytes trampoline)
+xbdm.patch_in_jump(0x82000000, 0x90000000, linked=False, scratch_reg=11)
 ```
 
 ---
 
 ## Features
 
-✅ **Full XBDM Protocol Support** — Memory read/write, function calls, file transfers  
+✅ **Full XBDM/JRPC Protocol Support** — Memory read/write, function calls, file transfers  
 ✅ **Screenshot Capture** — Xbox 360 Xenos GPU untiling with 18x NumPy acceleration  
 ✅ **Cross-Platform** — Windows, Android, Linux support  
 ✅ **Module Loading** — Load and unload console modules  

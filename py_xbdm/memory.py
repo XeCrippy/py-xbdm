@@ -11,13 +11,15 @@ def read_memory_text(conn, address: int, length: int) -> bytes:
     if resp.code != 202:
         raise XBDMCommandError(resp.code, resp.message)
 
-    hex_line = conn.recv_line().strip()
+    # Console may split hex data across multiple lines; read until "." terminator
+    hex_parts = []
+    while True:
+        line = conn.recv_line().strip()
+        if line == b".":
+            break
+        hex_parts.append(line.decode("ascii"))
 
-    peek = conn.recv_line()
-    if peek.strip() != b".":
-        pass
-
-    return bytes.fromhex(hex_line.decode("ascii"))
+    return bytes.fromhex("".join(hex_parts))
 
 def write_memory(conn, address: int, data: bytes):
     cmd = f"setmem addr=0x{address:X} data={data.hex()}\r\n"
