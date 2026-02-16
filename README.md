@@ -252,8 +252,8 @@ xbdm.patch_in_jump(0x82000000, 0x90000000, linked=False, scratch_reg=11)
 ✅ **Cross-Platform** — Windows, Android, Linux support  
 ✅ **Module Loading** — Load and unload console modules  
 ✅ **File System** — Full directory traversal and transfer  
-✅ **Debug Control** — Pause/resume execution
-✅ **System Control** — Time sync, notifications, shutdown, reboot, launch title
+✅ **Debug Control** — Pause/resume execution 
+✅ **System Control** — Time sync, notifications, shutdown  
 
 ---
 
@@ -300,6 +300,7 @@ except RuntimeError as e:
 ---
 
 *This library is provided as-is for educational and development purposes.*
+
 
 
 
